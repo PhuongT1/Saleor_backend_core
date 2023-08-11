@@ -8,6 +8,7 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple
 
 from asgiref.local import Local
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
@@ -129,6 +130,9 @@ class ApiCall:
         self._reported = False
         self.request = request
 
+    async def areport(self):
+        return await sync_to_async(self.report, thread_sensitive=False)()
+
     def report(self):
         if self._reported or not settings.OBSERVABILITY_ACTIVE:
             return
@@ -180,6 +184,16 @@ def report_view(method):
     def wrapper(self, request, *args, **kwargs):
         with report_api_call(request) as api_call:
             response = method(self, request, *args, **kwargs)
+            api_call.response = response
+            return response
+
+    return wrapper
+
+
+def async_report_view(func):
+    async def wrapper(self, request, *args, **kwargs):
+        with report_api_call(request) as api_call:
+            response = await func(self, request, *args, **kwargs)
             api_call.response = response
             return response
 

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import opentracing
 import opentracing.tags
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
@@ -29,6 +30,9 @@ from .query_cost_map import COST_MAP
 from .utils import format_error, query_fingerprint, query_identifier
 
 INT_ERROR_MSG = "Int cannot represent non 32-bit signed integer value"
+
+arender = sync_to_async(render, thread_sensitive=True)
+aget_context_value = sync_to_async(get_context_value, thread_sensitive=True)
 
 
 def tracing_wrapper(execute, sql, params, many, context):
@@ -96,23 +100,17 @@ class GraphQLView(View):
         except (ImportError, AttributeError):
             raise ImportError(f"Cannot import '{middleware_name}' graphene middleware!")
 
-    @observability.report_view
-    def dispatch(self, request, *args, **kwargs):
-        # Handle options method the GraphQlView restricts it.
-        if request.method == "GET":
-            if settings.PLAYGROUND_ENABLED:
-                return self.render_playground(request)
-            return HttpResponseNotAllowed(["OPTIONS", "POST"])
-        elif request.method == "POST":
-            return self.handle_query(request)
-        else:
-            if settings.PLAYGROUND_ENABLED:
-                return HttpResponseNotAllowed(["GET", "OPTIONS", "POST"])
-            else:
-                return HttpResponseNotAllowed(["OPTIONS", "POST"])
+    async def get(self, request, *args, **kwargs):
+        if settings.PLAYGROUND_ENABLED:
+            return await self.render_playground(request)
+        return HttpResponseNotAllowed(["OPTIONS", "POST"])
 
-    def render_playground(self, request):
-        return render(
+    @observability.async_report_view
+    async def post(self, request, *args, **kwargs):
+        return await self.handle_query(request)
+
+    async def render_playground(self, request):
+        return await arender(
             request,
             "graphql/playground.html",
             {
@@ -121,7 +119,7 @@ class GraphQLView(View):
             },
         )
 
-    def _handle_query(self, request: HttpRequest) -> JsonResponse:
+    async def _handle_query(self, request: HttpRequest) -> JsonResponse:
         try:
             data = self.parse_body(request)
         except ValueError:
@@ -131,16 +129,16 @@ class GraphQLView(View):
             )
 
         if isinstance(data, list):
-            responses = [self.get_response(request, entry) for entry in data]
+            responses = [await self.get_response(request, entry) for entry in data]
             result: Union[list, Optional[dict]] = [
-                response for response, code in responses
+                response for response, _code in responses
             ]
-            status_code = max((code for response, code in responses), default=200)
+            status_code = max((code for _response, code in responses), default=200)
         else:
-            result, status_code = self.get_response(request, data)
+            result, status_code = await self.get_response(request, data)
         return JsonResponse(data=result, status=status_code, safe=False)
 
-    def handle_query(self, request: HttpRequest) -> JsonResponse:
+    async def handle_query(self, request: HttpRequest) -> JsonResponse:
         tracer = opentracing.global_tracer()
 
         # Disable extending spans from header due to:
@@ -179,7 +177,8 @@ class GraphQLView(View):
                 if request_ips := request.META.get(additional_ip_header):
                     span.set_tag(f"ip_{additional_ip_header}", request_ips[:100])
 
-            response = self._handle_query(request)
+            response = await self._handle_query(request)
+
             span.set_tag(opentracing.tags.HTTP_STATUS_CODE, response.status_code)
 
             # RFC2616: Content-Length is defined in bytes,
@@ -188,14 +187,14 @@ class GraphQLView(View):
             span.set_tag("http.content_length", len(response.content))
             with observability.report_api_call(request) as api_call:
                 api_call.response = response
-                api_call.report()
+                await api_call.areport()
             return response
 
-    def get_response(
+    async def get_response(
         self, request: HttpRequest, data: dict
     ) -> Tuple[Optional[Dict[str, List[Any]]], int]:
         with observability.report_gql_operation() as operation:
-            execution_result = self.execute_graphql_request(request, data)
+            execution_result = await self.execute_graphql_request(request, data)
             status_code = 200
             if execution_result:
                 response = {}
@@ -259,7 +258,7 @@ class GraphQLView(View):
                         raise GraphQLError(msg)
         return query_with_schema
 
-    def execute_graphql_request(self, request: HttpRequest, data: dict):
+    async def execute_graphql_request(self, request: HttpRequest, data: dict):
         with opentracing.global_tracer().start_active_span("graphql_query") as scope:
             span = scope.span
             span.set_tag(opentracing.tags.COMPONENT, "graphql")
@@ -308,7 +307,7 @@ class GraphQLView(View):
                 # executor is not a valid argument in all backends
                 extra_options["executor"] = self.executor
 
-            context = get_context_value(request)
+            context = await aget_context_value(request)
             if app := getattr(request, "app", None):
                 span.set_tag("app.id", app.id)
                 span.set_tag("app.name", app.name)
@@ -321,10 +320,13 @@ class GraphQLView(View):
                     )
                     if should_use_cache_for_scheme:
                         key = generate_cache_key(raw_query_string)
-                        response = cache.get(key)
+                        response = await cache.aget(key)
 
                     if not response:
-                        response = document.execute(
+                        async_document_execute = sync_to_async(
+                            document.execute, thread_sensitive=True
+                        )
+                        response = await async_document_execute(
                             root=self.get_root_value(),
                             variables=variables,
                             operation_name=operation_name,
@@ -333,12 +335,11 @@ class GraphQLView(View):
                             **extra_options,
                         )
                         if should_use_cache_for_scheme:
-                            cache.set(key, response)
+                            await cache.aset(key, response)
 
                     return set_query_cost_on_result(response, query_cost)
             except Exception as e:
                 span.set_tag(opentracing.tags.ERROR, True)
-
                 # In the graphql-core version that we are using,
                 # the Exception is raised for too big integers value.
                 # As it's a validation error we want to raise GraphQLError instead.
