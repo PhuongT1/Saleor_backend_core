@@ -28,6 +28,7 @@ All notable, unreleased changes to this project will be documented in this file.
 - Added support for the `BrokerProperties` custom header to webhooks to support Azure Service Bus - #15899 by @patrys
 - Extend valid address values - #15877 by @zedzior
 - Fixed a rare crash in the introspection query detection code - #15966 by @patrys
+- Fix transaction create mutation's psp_reference max length issue - #12696 by @ssuraliya
 
 # 3.19.0
 
