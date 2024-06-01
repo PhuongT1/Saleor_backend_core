@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 from django.urls import reverse
@@ -51,10 +51,10 @@ def test_refresh_token_with_audience(api_client, customer_user, settings):
     assert token
     payload = jwt_decode(token)
     assert payload["email"] == customer_user.email
-    assert datetime.fromtimestamp(payload["iat"]) == datetime.utcnow()
+    assert datetime.fromtimestamp(payload["iat"]) == datetime.now(timezone.utc)
     assert (
         datetime.fromtimestamp(payload["exp"])
-        == datetime.utcnow() + settings.JWT_TTL_ACCESS
+        == datetime.now(timezone.utc) + settings.JWT_TTL_ACCESS
     )
     assert payload["type"] == JWT_ACCESS_TYPE
     assert payload["token"] == customer_user.jwt_token_key
@@ -83,10 +83,10 @@ def test_refresh_token_get_token_from_cookie(api_client, customer_user, settings
     assert token
     payload = jwt_decode(token)
     assert payload["email"] == customer_user.email
-    assert datetime.fromtimestamp(payload["iat"]) == datetime.utcnow()
+    assert datetime.fromtimestamp(payload["iat"]) == datetime.now(timezone.utc)
     assert (
         datetime.fromtimestamp(payload["exp"])
-        == datetime.utcnow() + settings.JWT_TTL_ACCESS
+        == datetime.now(timezone.utc) + settings.JWT_TTL_ACCESS
     )
     assert payload["type"] == JWT_ACCESS_TYPE
     assert payload["token"] == customer_user.jwt_token_key
@@ -109,10 +109,10 @@ def test_refresh_token_get_token_from_input(api_client, customer_user, settings)
     assert token
     payload = jwt_decode(token)
     assert payload["email"] == customer_user.email
-    assert datetime.fromtimestamp(payload["iat"]) == datetime.utcnow()
+    assert datetime.fromtimestamp(payload["iat"]) == datetime.now(timezone.utc)
     assert (
         datetime.fromtimestamp(payload["exp"])
-        == datetime.utcnow() + settings.JWT_TTL_ACCESS
+        == datetime.now(timezone.utc) + settings.JWT_TTL_ACCESS
     )
     assert payload["type"] == JWT_ACCESS_TYPE
 
