@@ -19,6 +19,10 @@ from ....checkout.utils import (
     is_shipping_required,
     set_external_shipping_id,
 )
+from ....checkout.webhooks.shipping_list_methods_for_checkout import (
+    ShippingListMethodsForCheckout,
+)
+from ....graphql.utils import get_user_or_app_from_context
 from ....shipping import interface as shipping_interface
 from ....shipping import models as shipping_models
 from ....shipping.utils import convert_to_shipping_method_data
@@ -134,15 +138,16 @@ class CheckoutDeliveryMethodUpdate(BaseMutation):
         cls,
         info: ResolveInfo,
         shipping_method_id,
-        checkout_info,
+        checkout_info: "CheckoutInfo",
         lines,
         checkout,
         manager,
     ):
-        delivery_method = manager.get_shipping_method(
-            checkout=checkout,
-            channel_slug=checkout.channel.slug,
+        requestor = get_user_or_app_from_context(info.context)
+        delivery_method = ShippingListMethodsForCheckout.get_shipping_method(
             shipping_method_id=shipping_method_id,
+            checkout=checkout,
+            requestor=requestor,
         )
 
         if delivery_method is None and shipping_method_id:

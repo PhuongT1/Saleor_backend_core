@@ -60,7 +60,6 @@ if TYPE_CHECKING:
         ProductType,
         ProductVariant,
     )
-    from ..shipping.interface import ShippingMethodData
     from ..shipping.models import ShippingMethod, ShippingZone
     from ..site.models import SiteSettings
     from ..tax.models import TaxClass
@@ -744,12 +743,6 @@ class BasePlugin:
     get_order_shipping_tax_rate: Callable[["Order", Any], Any]
     get_payment_config: Callable[[Any], Any]
 
-    # Note: This method is deprecated in Saleor 3.20 and will be removed in Saleor 3.21.
-    # Webhook-related functionality will be moved from the plugin to core modules.
-    get_shipping_methods_for_checkout: Callable[
-        ["Checkout", Any], list["ShippingMethodData"]
-    ]
-
     get_supported_currencies: Callable[[Any], Any]
 
     # Return tax code from object meta.
@@ -1229,15 +1222,6 @@ class BasePlugin:
     # Note: This method is deprecated in Saleor 3.20 and will be removed in Saleor 3.21.
     # Webhook-related functionality will be moved from the plugin to core modules.
     transaction_item_metadata_updated: Callable[["TransactionItem", Any], Any]
-
-    # Trigger when product is created.
-    #
-    # Overwrite this method if you need to trigger specific logic after a product is
-    # created.
-    #
-    # Note: This method is deprecated in Saleor 3.20 and will be removed in Saleor 3.21.
-    # Webhook-related functionality will be moved from the plugin to core modules.
-    product_created: Callable[["Product", Any, None], Any]
 
     # Trigger when product is deleted.
     #

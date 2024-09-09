@@ -25,6 +25,7 @@ from ..shipping.utils import (
 )
 from ..warehouse import WarehouseClickAndCollectOption
 from ..warehouse.models import Warehouse
+from .webhooks.shipping_list_methods_for_checkout import ShippingListMethodsForCheckout
 
 if TYPE_CHECKING:
     from ..account.models import Address, User
@@ -546,6 +547,7 @@ def get_all_shipping_methods_list(
     manager,
     database_connection_name: str = settings.DATABASE_CONNECTION_DEFAULT_NAME,
 ):
+    requestor = manager.requestor_getter() if manager.requestor_getter else None
     return list(
         itertools.chain(
             get_valid_internal_shipping_method_list_for_checkout_info(
@@ -555,8 +557,8 @@ def get_all_shipping_methods_list(
                 shipping_channel_listings,
                 database_connection_name=database_connection_name,
             ),
-            manager.list_shipping_methods_for_checkout(
-                checkout=checkout_info.checkout, channel_slug=checkout_info.channel.slug
+            ShippingListMethodsForCheckout.list_shipping_methods(
+                checkout_info.checkout, requestor
             ),
         )
     )

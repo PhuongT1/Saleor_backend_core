@@ -88,7 +88,7 @@ CREATE_PRODUCT_MUTATION = """
 
 
 @patch("saleor.plugins.manager.PluginsManager.product_updated")
-@patch("saleor.plugins.manager.PluginsManager.product_created")
+@patch("saleor.product.webhooks.ProductCreated.trigger_webhook_async")
 def test_create_product(
     created_webhook_mock,
     updated_webhook_mock,
@@ -184,7 +184,8 @@ def test_create_product(
     assert product.metadata == {metadata_key: metadata_value}
     assert product.private_metadata == {metadata_key: metadata_value}
 
-    created_webhook_mock.assert_called_once_with(product)
+    created_webhook_mock.assert_called_once()
+    assert created_webhook_mock.call_args[0][0] == product
     updated_webhook_mock.assert_not_called()
     for rule in get_active_catalogue_promotion_rules():
         assert rule.variants_dirty
@@ -1339,8 +1340,8 @@ def test_product_create_with_collections_webhook(
     published_collection,
     product_type,
     category,
-    monkeypatch,
 ):
+    # given
     query = """
     mutation createProduct($productTypeId: ID!, $collectionId: ID!, $categoryId: ID!) {
         productCreate(input: {
@@ -1367,19 +1368,11 @@ def test_product_create_with_collections_webhook(
 
     """
 
-    def assert_product_has_collections(product):
-        assert product.collections.count() > 0
-        assert product.collections.first() == published_collection
-
-    monkeypatch.setattr(
-        "saleor.plugins.manager.PluginsManager.product_created",
-        lambda _, product: assert_product_has_collections(product),
-    )
-
     product_type_id = graphene.Node.to_global_id("ProductType", product_type.pk)
     category_id = graphene.Node.to_global_id("Category", category.pk)
     collection_id = graphene.Node.to_global_id("Collection", published_collection.pk)
 
+    # when
     response = staff_api_client.post_graphql(
         query,
         {
@@ -1389,8 +1382,15 @@ def test_product_create_with_collections_webhook(
         },
         permissions=[permission_manage_products],
     )
+    content = get_graphql_content(response)
+    data = content["data"]["productCreate"]
 
-    get_graphql_content(response)
+    # then
+    product_node_id = data["product"]["id"]
+    product_id = graphene.Node.from_global_id(product_node_id)[1]
+    product = Product.objects.get(pk=product_id)
+    assert product.collections.count() > 0
+    assert product.collections.first() == published_collection
 
 
 def test_product_create_with_invalid_json_description(staff_api_client):

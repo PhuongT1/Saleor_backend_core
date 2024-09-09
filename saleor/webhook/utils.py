@@ -1,17 +1,22 @@
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from django.conf import settings
 from django.db.models import Q
 from django.db.models.expressions import Exists, OuterRef
+from django.utils.module_loading import import_string
 
 from ..app.models import App
+from ..webhook.base import WebhookBaseType
+from .base import AsyncWebhookBase
 from .event_types import WebhookEventAsyncType, WebhookEventSyncType
 from .models import Webhook, WebhookEvent
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
+    from ..graphql.core.types.event import SubscriptionObjectType
 
 
 def get_filter_for_single_webhook_event(
@@ -57,12 +62,16 @@ def get_filter_for_single_webhook_event(
 
 
 def get_webhooks_for_event(
-    event_type: str,
+    event_type: Union[str, type[WebhookBaseType]],
     webhooks: Optional["QuerySet[Webhook]"] = None,
     apps_ids: Optional["list[int]"] = None,
     apps_identifier: Optional[list[str]] = None,
 ) -> "QuerySet[Webhook]":
     """Get active webhooks from the database for an event."""
+    if not isinstance(event_type, str):
+        # To remove when all events are migrated to classes and event_type is always
+        # WebhookBaseType type.
+        event_type = event_type.event_type
 
     if webhooks is None:
         # For this QS replica usage is applied later, as this QS could be also passed
@@ -142,3 +151,14 @@ def get_webhooks_for_multiple_events(
         if event not in active_event_map:
             active_event_map[event] = set()
     return active_event_map
+
+
+def get_async_subscription_type(event_type: str) -> Optional["SubscriptionObjectType"]:
+    async_events = {
+        cls.event_type: cls.subscription_type
+        for cls in AsyncWebhookBase.__subclasses__()
+    }
+    subscription_type = async_events.get(event_type, None)
+    if subscription_type:
+        return import_string(subscription_type)
+    return None

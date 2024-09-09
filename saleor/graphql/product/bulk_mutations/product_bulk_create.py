@@ -16,10 +16,12 @@ from ....core.utils import prepare_unique_slug
 from ....core.utils.editorjs import clean_editor_js
 from ....core.utils.validators import get_oembed_data
 from ....discount.utils.promotion import mark_active_catalogue_promotion_rules_as_dirty
+from ....graphql.utils import get_user_or_app_from_context
 from ....permission.enums import ProductPermissions
 from ....product import ProductMediaTypes, models
 from ....product.error_codes import ProductBulkCreateErrorCode
 from ....product.models import CollectionProduct
+from ....product.webhooks import ProductCreated
 from ....thumbnail.utils import get_filename_from_url
 from ....warehouse.models import Warehouse
 from ....webhook.event_types import WebhookEventAsyncType
@@ -868,9 +870,15 @@ class ProductBulkCreate(BaseMutation):
     def post_save_actions(cls, info, products, variants, channels):
         manager = get_plugin_manager_promise(info.context).get()
         product_ids = []
-        webhooks = get_webhooks_for_event(WebhookEventAsyncType.PRODUCT_CREATED)
+        webhooks = get_webhooks_for_event(ProductCreated)
+        requestor = get_user_or_app_from_context(info.context)
         for product in products:
-            cls.call_event(manager.product_created, product.node, webhooks=webhooks)
+            ProductCreated.trigger_webhook_async(
+                subscribable_object=product.node,
+                requestor=requestor,
+                webhooks=webhooks,
+                allow_replica=getattr(info.context, "allow_replica", True),
+            )
             product_ids.append(product.node.id)
 
         webhooks = get_webhooks_for_event(WebhookEventAsyncType.PRODUCT_VARIANT_CREATED)

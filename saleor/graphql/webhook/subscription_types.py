@@ -89,7 +89,6 @@ from ..shipping.dataloaders import ShippingMethodChannelListingByChannelSlugLoad
 from ..shipping.types import ShippingMethod
 from ..translations import types as translation_types
 from ..warehouse.dataloaders import WarehouseByIdLoader
-from .resolvers import resolve_shipping_methods_for_checkout
 
 TRANSLATIONS_TYPES_MAP = {
     ProductTranslation: translation_types.ProductTranslation,
@@ -884,14 +883,6 @@ class ProductBase(AbstractType):
     def resolve_category(root, _info: ResolveInfo):
         _, product = root
         return product.category
-
-
-class ProductCreated(SubscriptionObjectType, ProductBase):
-    class Meta:
-        root_type = "Product"
-        enable_dry_run = True
-        interfaces = (Event,)
-        description = "Event sent when new product is created." + ADDED_IN_32
 
 
 class ProductUpdated(SubscriptionObjectType, ProductBase):
@@ -2560,30 +2551,6 @@ class PaymentListGateways(SubscriptionObjectType, CheckoutBase):
         doc_category = DOC_CATEGORY_PAYMENTS
 
 
-class ShippingListMethodsForCheckout(SubscriptionObjectType, CheckoutBase):
-    shipping_methods = NonNullList(
-        ShippingMethod,
-        description="Shipping methods that can be used with this checkout."
-        + ADDED_IN_36,
-    )
-
-    @staticmethod
-    @plugin_manager_promise_callback
-    def resolve_shipping_methods(root, info: ResolveInfo, manager):
-        _, checkout = root
-        database_connection_name = get_database_connection_name(info.context)
-        return resolve_shipping_methods_for_checkout(
-            info, checkout, manager, database_connection_name
-        )
-
-    class Meta:
-        root_type = None
-        enable_dry_run = False
-        interfaces = (Event,)
-        description = "List shipping methods for checkout." + ADDED_IN_36
-        doc_category = DOC_CATEGORY_CHECKOUT
-
-
 class CalculateTaxes(SubscriptionObjectType):
     tax_base = graphene.Field(
         "saleor.graphql.core.types.taxes.TaxableObject", required=True
@@ -2614,6 +2581,8 @@ class CheckoutFilterShippingMethods(SubscriptionObjectType, CheckoutBase):
     @staticmethod
     @plugin_manager_promise_callback
     def resolve_shipping_methods(root, info: ResolveInfo, manager):
+        from ..checkout.subscriptions import resolve_shipping_methods_for_checkout
+
         _, checkout = root
         database_connection_name = get_database_connection_name(info.context)
         return resolve_shipping_methods_for_checkout(
@@ -2933,9 +2902,6 @@ SYNC_WEBHOOK_TYPES_MAP = {
     WebhookEventSyncType.CHECKOUT_FILTER_SHIPPING_METHODS: (
         CheckoutFilterShippingMethods
     ),
-    WebhookEventSyncType.SHIPPING_LIST_METHODS_FOR_CHECKOUT: (
-        ShippingListMethodsForCheckout
-    ),
     WebhookEventSyncType.CHECKOUT_CALCULATE_TAXES: CalculateTaxes,
     WebhookEventSyncType.ORDER_CALCULATE_TAXES: CalculateTaxes,
     WebhookEventSyncType.PAYMENT_GATEWAY_INITIALIZE_SESSION: (
@@ -3016,7 +2982,6 @@ ASYNC_WEBHOOK_TYPES_MAP = {
     WebhookEventAsyncType.DRAFT_ORDER_CREATED: DraftOrderCreated,
     WebhookEventAsyncType.DRAFT_ORDER_UPDATED: DraftOrderUpdated,
     WebhookEventAsyncType.DRAFT_ORDER_DELETED: DraftOrderDeleted,
-    WebhookEventAsyncType.PRODUCT_CREATED: ProductCreated,
     WebhookEventAsyncType.PRODUCT_UPDATED: ProductUpdated,
     WebhookEventAsyncType.PRODUCT_DELETED: ProductDeleted,
     WebhookEventAsyncType.PRODUCT_METADATA_UPDATED: ProductMetadataUpdated,
