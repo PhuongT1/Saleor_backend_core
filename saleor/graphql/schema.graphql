@@ -15906,6 +15906,16 @@ type Mutation {
   ): GiftCardSettingsUpdate @doc(category: "Gift cards")
 
   """
+  Reset circuit breaker for provided app. 
+  
+  Requires one of the following permissions: MANAGE_SETTINGS.
+  """
+  resetCircuitBreaker(
+    """The app ID to reset the breaker."""
+    appId: ID
+  ): ResetCircuitBreaker @doc(category: "Shop")
+
+  """
   Manage shipping method's availability in channels. 
   
   Requires one of the following permissions: MANAGE_SHIPPING.
@@ -21852,6 +21862,18 @@ input TimePeriodInputType {
 
   """The type of the period."""
   type: TimePeriodTypeEnum!
+}
+
+"""
+Reset circuit breaker for provided app. 
+
+Requires one of the following permissions: MANAGE_SETTINGS.
+"""
+type ResetCircuitBreaker @doc(category: "Shop") {
+  """App which circuit breaker was reset."""
+  app: App
+  shopErrors: [ShopError!]! @deprecated(reason: "This field will be removed in Saleor 4.0. Use `errors` field instead.")
+  errors: [ShopError!]!
 }
 
 """

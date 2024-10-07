@@ -12,6 +12,7 @@ from ..translations.mutations import ShopSettingsTranslate
 from .mutations import (
     GiftCardSettingsUpdate,
     OrderSettingsUpdate,
+    ResetCircuitBreaker,
     ShopAddressUpdate,
     ShopDomainUpdate,
     ShopFetchTaxRates,
@@ -101,3 +102,4 @@ class ShopMutations(graphene.ObjectType):
         )
     )
     gift_card_settings_update = GiftCardSettingsUpdate.Field()
+    reset_circuit_breaker = ResetCircuitBreaker.Field()

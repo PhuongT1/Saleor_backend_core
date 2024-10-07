@@ -24,6 +24,9 @@ class Storage:
     ) -> int:
         pass
 
+    def reset_breaker(self, app_id: int):
+        pass
+
 
 class InMemoryStorage(Storage):
     def __init__(self):
@@ -52,6 +55,17 @@ class InMemoryStorage(Storage):
         filtered_entries = [event for event in events if event > now - ttl_seconds]
         self._events[key] = filtered_entries
         return len(filtered_entries)
+
+    def reset_breaker(self, app_id: int):
+        self._last_open.pop(app_id, None)
+        self._events = defaultdict(
+            list,
+            {
+                key: value
+                for key, value in self._events.items()
+                if not key.startswith(str(app_id))
+            },
+        )
 
 
 class RedisStorage(Storage):
@@ -118,3 +132,11 @@ class RedisStorage(Storage):
         except (RedisError, IndexError):
             logger.warning(self.WARNING_MESSAGE, exc_info=True)
             return 0
+
+    def reset_breaker(self, app_id: int):
+        try:
+            keys = self._client.keys(f"{self.KEY_PREFIX}-{app_id}*")
+            if keys:
+                self._client.delete(*keys)
+        except RedisError:
+            logger.warning(self.WARNING_MESSAGE, exc_info=True)
