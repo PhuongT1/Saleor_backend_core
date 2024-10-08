@@ -7694,6 +7694,51 @@ def shipping_app_with_subscription(db, permission_manage_shipping):
 
 
 @pytest.fixture
+def exclude_shipping_app_without_subscription(db, permission_manage_checkouts):
+    app = App.objects.create(name="Shipping App without subscription", is_active=True)
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_checkouts)
+
+    webhook = Webhook.objects.create(
+        name="shipping-webhook-1",
+        app=app,
+        target_url="https://shipping-app.com/api/",
+    )
+    WebhookEvent.objects.create(
+        event_type=WebhookEventSyncType.CHECKOUT_FILTER_SHIPPING_METHODS,
+        webhook=webhook,
+    )
+    return app
+
+
+@pytest.fixture
+def exclude_shipping_app_with_subscription(db, permission_manage_checkouts):
+    app = App.objects.create(name="Shipping App with subscription", is_active=True)
+    app.tokens.create(name="Default")
+    app.permissions.add(permission_manage_checkouts)
+
+    webhook = Webhook.objects.create(
+        name="shipping-webhook-2",
+        app=app,
+        target_url="https://shipping-app.com/api/",
+        subscription_query="""
+        subscription {
+            event {
+                ... on CheckoutFilterShippingMethods {
+                __typename
+                }
+            }
+        }
+        """,
+    )
+    WebhookEvent.objects.create(
+        event_type=WebhookEventSyncType.CHECKOUT_FILTER_SHIPPING_METHODS,
+        webhook=webhook,
+    )
+    return app
+
+
+@pytest.fixture
 def list_stored_payment_methods_app(db, permission_manage_payments):
     app = App.objects.create(
         name="List payment methods app",
