@@ -1,4 +1,5 @@
 import graphene
+from graphql import GraphQLError
 
 from ...permission.enums import ProductPermissions
 from ...permission.utils import has_one_of_permissions
@@ -522,6 +523,9 @@ class ProductQueries(graphene.ObjectType):
             )
 
         def _resolve_products(channel_obj):
+            if not channel_obj:
+                raise GraphQLError(f"Channel with '{channel}' slug does not exist.")
+
             qs = resolve_products(info, requestor, channel_obj, limited_channel_access)
             if search:
                 qs = ChannelQsContext(
@@ -531,6 +535,8 @@ class ProductQueries(graphene.ObjectType):
             qs = filter_connection_queryset(
                 qs, kwargs, allow_replica=info.context.allow_replica
             )
+            if not qs.exists():
+                raise GraphQLError(f"No products found for channel '{channel}'")
             return create_connection_slice(qs, info, kwargs, ProductCountableConnection)
 
         if channel:
