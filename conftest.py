@@ -24,6 +24,7 @@ prepare_test_db_connections()
 
 pytest_plugins = [
     "saleor.tests.fixtures",
+    "saleor.app.tests.fixtures",
     "saleor.discount.tests.test_utils.fixtures",
     "saleor.plugins.tests.fixtures",
     "saleor.graphql.tests.fixtures",
