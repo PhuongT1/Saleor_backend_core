@@ -105,11 +105,11 @@ DATABASE_CONNECTION_REPLICA_NAME = "replica"
 
 DATABASES = {
     DATABASE_CONNECTION_DEFAULT_NAME: dj_database_url.config(
-        default="postgres://default:OS4klECf7Kxt@ep-nameless-pond-a1gvyj8b.ap-southeast-1.aws.neon.tech:5432/verceldb?sslmode=require",
+        default="postgres://neondb_owner:bTJR5Z2cqHxf@ep-royal-meadow-a1jxccso-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
         conn_max_age=DB_CONN_MAX_AGE,
     ),
     DATABASE_CONNECTION_REPLICA_NAME: dj_database_url.config(
-        default="postgres://default:OS4klECf7Kxt@ep-nameless-pond-a1gvyj8b.ap-southeast-1.aws.neon.tech:5432/verceldb?sslmode=require",
+        default="postgres://neondb_owner:bTJR5Z2cqHxf@ep-royal-meadow-a1jxccso-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require",
         # TODO: We need to add read only user to saleor platform,
         # and we need to update docs.
         # default="postgres://saleor_read_only:saleor@localhost:5432/saleor",
